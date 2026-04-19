@@ -1,0 +1,35 @@
+version: "3.8"
+
+services:
+  generation-service:
+    build: ./generation-service
+    ports:
+      - "3001:3001"
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - UPSTASH_REDIS_URL=${UPSTASH_REDIS_URL}
+    networks:
+      - exam-network
+
+  query-service:
+    build: ./query-service
+    ports:
+      - "3002:3002"
+    environment:
+      - UPSTASH_REDIS_URL=${UPSTASH_REDIS_URL}
+    networks:
+      - exam-network
+
+  auth-service:
+    build: ./auth-service
+    ports:
+      - "3003:3003"
+    environment:
+      - UPSTASH_REDIS_URL=${UPSTASH_REDIS_URL}
+      - JWT_SECRET=${JWT_SECRET}
+    networks:
+      - exam-network
+
+networks:
+  exam-network:
+    driver: bridge
