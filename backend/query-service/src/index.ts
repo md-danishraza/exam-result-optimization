@@ -2,38 +2,35 @@
 // It has absolutely zero connection to PostgreSQL to prevent database lockups.
 
 import express from "express";
-import Redis from "ioredis";
+import { Redis } from '@upstash/redis';
 import dotenv from "dotenv";
 
 dotenv.config();
 
 const app = express();
-const redis = new Redis(process.env.UPSTASH_REDIS_URL as string, {
-  family: 4, // CRITICAL: Forces IPv4 to bypass the Node 18/Docker networking bug
-  maxRetriesPerRequest: null, // Highly recommended by rate-limit-redis to prevent queue blocking
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL as string,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN as string,
 });
 
-app.get("/api/results/:rollNumber", async (req, res) => {
+app.get('/api/results/:rollNumber', async (req, res) => {
   try {
-    const rollNumber = req.params.rollNumber;
+      const rollNumber = req.params.rollNumber;
+      const cachedResult = await redis.get(`result:${rollNumber}`);
+      
+      if (cachedResult) {
+          // NO NEED for JSON.parse(). Upstash already parsed it into an object!
+          return res.status(200).json(cachedResult);
+      }
 
-    // 1. Fetch directly from In-Memory Cache
-    const cachedResult = await redis.get(`result:${rollNumber}`);
-
-    if (cachedResult) {
-      // CQRS Success: Data served from memory in milliseconds
-      return res.status(200).json(JSON.parse(cachedResult));
-    }
-
-    // 2. If not in cache, we return 404. We DO NOT fall back to Postgres.
-    // This strict separation ensures the database never crashes during a cache miss storm.
-    return res
-      .status(404)
-      .json({ message: "Result not found or not yet declared." });
+      return res.status(404).json({ message: 'Result not found or not yet declared.' });
+      
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Internal Server Error" });
+      console.error(error);
+      res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
-app.listen(3002, () => console.log("Query Service running on port 3002"));
+app.listen(3002, "0.0.0.0", () =>
+  console.log("Query Service running on port 3002")
+);

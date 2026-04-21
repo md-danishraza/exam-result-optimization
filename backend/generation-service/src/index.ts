@@ -6,7 +6,7 @@ import multer from "multer";
 import csv from "csv-parser";
 import fs from "fs";
 import { Pool } from "pg";
-import Redis from "ioredis";
+import { Redis } from "@upstash/redis";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -16,9 +16,9 @@ const upload = multer({ dest: "uploads/" });
 
 // Database Connections
 const pool = new Pool({ connectionString: process.env.SUPABASE_URL });
-const redis = new Redis(process.env.UPSTASH_REDIS_URL as string, {
-  family: 4, // CRITICAL: Forces IPv4 to bypass the Node 18/Docker networking bug
-  maxRetriesPerRequest: null, // Highly recommended by rate-limit-redis to prevent queue blocking
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL as string,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN as string,
 });
 
 app.post("/api/admin/upload-results", upload.single("file"), (req, res) => {
@@ -32,38 +32,59 @@ app.post("/api/admin/upload-results", upload.single("file"), (req, res) => {
     .pipe(csv())
     .on("data", (data) => results.push(data))
     .on("end", async () => {
+      // Connect outside the try-catch so we can release it in the finally block
+      const client = await pool.connect();
+
       try {
-        // 1. Write to PostgreSQL (The Command)
-        const client = await pool.connect();
         for (const row of results) {
+          // 1. SKIP EMPTY ROWS: If there's a blank line in the CSV, ignore it.
+          if (!row.roll_number || !row.student_name) {
+            continue;
+          }
+
+          // 2. PARSE DATA CORRECTLY: The CSV provides strings. We must cast them.
+          const totalScore = parseInt(row.total_score, 10);
+          const marksString = row.marks; // Already a string from the CSV
+
+          // Write to PostgreSQL
+          // Notice we pass `marksString` directly, NOT wrapped in JSON.stringify
           await client.query(
-            `INSERT INTO results (roll_number, student_name, marks, total_score) 
-                         VALUES ($1, $2, $3, $4) 
-                         ON CONFLICT (roll_number) DO UPDATE SET marks = $3, total_score = $4`,
-            [
-              row.roll_number,
-              row.student_name,
-              JSON.stringify(row.marks),
-              row.total_score,
-            ]
+            `INSERT INTO exam_system.results (roll_number, student_name, marks, total_score) 
+             VALUES ($1, $2, $3, $4) 
+             ON CONFLICT (roll_number) DO UPDATE SET marks = $3, total_score = $4`,
+            [row.roll_number, row.student_name, marksString, totalScore]
           );
 
-          // 2. Push to Redis Cache (Preparing the Read Model)
-          // We store it as a simple stringified JSON for microsecond retrieval
-          await redis.set(`result:${row.roll_number}`, JSON.stringify(row));
-        }
-        client.release();
+          // 3. PUSH TO REDIS CACHE
+          // We build a clean JavaScript object so it stringifies perfectly for the frontend
+          const redisData = {
+            roll_number: row.roll_number,
+            student_name: row.student_name,
+            marks: JSON.parse(marksString), // Turn the CSV string back into a real object
+            total_score: totalScore,
+          };
 
-        // Cleanup temp file
-        fs.unlinkSync(req.file!.path);
+          await redis.set(`result:${row.roll_number}`, redisData);
+        }
+
         res
           .status(200)
           .json({ message: "Results successfully processed and cached." });
       } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Database transaction failed" });
+        console.error("Upload Error:", error);
+        res.status(500).json({ error: "Database transaction failed." });
+      } finally {
+        // Always release the database connection
+        client.release();
+
+        // Always delete the temp file, even if the database crashes
+        if (fs.existsSync(req.file!.path)) {
+          fs.unlinkSync(req.file!.path);
+        }
       }
     });
 });
 
-app.listen(3001, () => console.log("Generation Service running on port 3001"));
+app.listen(3001, "0.0.0.0", () =>
+  console.log("Generation Service running on port 3001")
+);

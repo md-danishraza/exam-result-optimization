@@ -36,3 +36,5 @@ uploads/
 .idea/
 .DS_Store
 Thumbs.db
+
+../test-students.csv.txt
