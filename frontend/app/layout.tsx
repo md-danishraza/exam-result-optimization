@@ -22,7 +22,7 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   
-  metadataBase: new URL("https://your-exam-portal-url.vercel.app"),
+  metadataBase: new URL("https://exam-result-optimization.vercel.app"),
   title: {
     default: "ExamPortal | Fast & Secure Result Checking",
     template: "%s | ExamPortal",
