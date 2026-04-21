@@ -32,7 +32,7 @@ app.get("/api/results/:rollNumber", async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3002;
+const PORT = Number(process.env.PORT) || 3002;
 app.listen(PORT, "0.0.0.0", () =>
   console.log("Query Service running on port 3002")
 );
