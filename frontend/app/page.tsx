@@ -78,7 +78,7 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-50 text-black font-sans flex flex-col items-center justify-center p-6">
+    <main className="min-h-screen bg-rose-50 text-black font-sans flex flex-col items-center justify-center p-6">
       <div className="w-full max-w-4xl">
         <header className="mb-12 text-center">
           <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight mb-4">

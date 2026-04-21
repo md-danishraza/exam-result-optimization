@@ -54,8 +54,13 @@ app.post("/api/auth/token", (req, res) => {
 app.get("/api/gateway/results", waitingRoomLimiter, async (req, res) => {
   try {
     const rollNumber = req.query.roll;
+    // const queryResponse = await fetch(
+    //   `http://query-service:3002/api/results/${rollNumber}`
+    // );
+    const QUERY_SERVICE_URL =
+      process.env.QUERY_SERVICE_URL || "http://localhost:3002";
     const queryResponse = await fetch(
-      `http://query-service:3002/api/results/${rollNumber}`
+      `${QUERY_SERVICE_URL}/api/results/${rollNumber}`
     );
     const data = await queryResponse.json();
     return res.status(queryResponse.status).json(data);
@@ -67,6 +72,7 @@ app.get("/api/gateway/results", waitingRoomLimiter, async (req, res) => {
   }
 });
 
-app.listen(3003, "0.0.0.0", () =>
+const PORT = process.env.PORT || 3003;
+app.listen(PORT, "0.0.0.0", () =>
   console.log("Auth & Rate Limit Service running on port 3003")
 );

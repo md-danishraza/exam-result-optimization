@@ -15,7 +15,8 @@ COPY . .
 RUN npm run build
 
 # Expose port (Override this in docker-compose)
-EXPOSE 3000
+# don't need for render
+# EXPOSE 3000
 
 # Start the application
 CMD [ "npm", "start" ]

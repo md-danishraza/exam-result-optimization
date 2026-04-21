@@ -2,7 +2,7 @@
 // It has absolutely zero connection to PostgreSQL to prevent database lockups.
 
 import express from "express";
-import { Redis } from '@upstash/redis';
+import { Redis } from "@upstash/redis";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -13,24 +13,26 @@ const redis = new Redis({
   token: process.env.UPSTASH_REDIS_REST_TOKEN as string,
 });
 
-app.get('/api/results/:rollNumber', async (req, res) => {
+app.get("/api/results/:rollNumber", async (req, res) => {
   try {
-      const rollNumber = req.params.rollNumber;
-      const cachedResult = await redis.get(`result:${rollNumber}`);
-      
-      if (cachedResult) {
-          // NO NEED for JSON.parse(). Upstash already parsed it into an object!
-          return res.status(200).json(cachedResult);
-      }
+    const rollNumber = req.params.rollNumber;
+    const cachedResult = await redis.get(`result:${rollNumber}`);
 
-      return res.status(404).json({ message: 'Result not found or not yet declared.' });
-      
+    if (cachedResult) {
+      // NO NEED for JSON.parse(). Upstash already parsed it into an object!
+      return res.status(200).json(cachedResult);
+    }
+
+    return res
+      .status(404)
+      .json({ message: "Result not found or not yet declared." });
   } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: 'Internal Server Error' });
+    console.error(error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
-app.listen(3002, "0.0.0.0", () =>
+const PORT = process.env.PORT || 3002;
+app.listen(PORT, "0.0.0.0", () =>
   console.log("Query Service running on port 3002")
 );
