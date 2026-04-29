@@ -8,8 +8,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Map Tailwind's default sans and mono fonts to our Next.js variables */
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -22,5 +23,17 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  /* Use the updated Tailwind sans font variable instead of Arial */
+  font-family: var(--font-sans);
+}
+
+/* Force the default monospace font to use our JetBrains Mono variable */
+code, pre, kbd, samp {
+  font-family: var(--font-mono);
+}
+
+/* Optional Neominimalist tweaks: Make selection look cooler */
+::selection {
+  background-color: #000;
+  color: #fff;
 }

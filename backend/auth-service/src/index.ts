@@ -58,7 +58,7 @@ app.get("/api/gateway/results", waitingRoomLimiter, async (req, res) => {
     //   `http://query-service:3002/api/results/${rollNumber}`
     // );
     const QUERY_SERVICE_URL =
-      process.env.QUERY_SERVICE_URL || "http://localhost:3002";
+      process.env.QUERY_SERVICE_URL || "http://query-service:3002";
     const queryResponse = await fetch(
       `${QUERY_SERVICE_URL}/api/results/${rollNumber}`
     );

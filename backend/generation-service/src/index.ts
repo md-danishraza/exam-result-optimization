@@ -32,36 +32,47 @@ app.post("/api/admin/upload-results", upload.single("file"), (req, res) => {
     .pipe(csv())
     .on("data", (data) => results.push(data))
     .on("end", async () => {
-      // Connect outside the try-catch so we can release it in the finally block
       const client = await pool.connect();
 
       try {
         for (const row of results) {
-          // 1. SKIP EMPTY ROWS: If there's a blank line in the CSV, ignore it.
+          // Skip empty rows
           if (!row.roll_number || !row.student_name) {
             continue;
           }
 
-          // 2. PARSE DATA CORRECTLY: The CSV provides strings. We must cast them.
           const totalScore = parseInt(row.total_score, 10);
-          const marksString = row.marks; // Already a string from the CSV
+          const marksString = row.marks;
 
-          // Write to PostgreSQL
-          // Notice we pass `marksString` directly, NOT wrapped in JSON.stringify
+          // 1. Write to PostgreSQL with the new extended schema
           await client.query(
-            `INSERT INTO exam_system.results (roll_number, student_name, marks, total_score) 
-             VALUES ($1, $2, $3, $4) 
-             ON CONFLICT (roll_number) DO UPDATE SET marks = $3, total_score = $4`,
-            [row.roll_number, row.student_name, marksString, totalScore]
+            `INSERT INTO exam_system.results 
+             (roll_number, student_name, dob, father_name, school_name, marks, total_score, status) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+             ON CONFLICT (roll_number) DO UPDATE SET 
+             student_name = $2, dob = $3, father_name = $4, school_name = $5, marks = $6, total_score = $7, status = $8`,
+            [
+              row.roll_number,
+              row.student_name,
+              row.dob,
+              row.father_name,
+              row.school_name,
+              marksString,
+              totalScore,
+              row.status,
+            ]
           );
 
-          // 3. PUSH TO REDIS CACHE
-          // We build a clean JavaScript object so it stringifies perfectly for the frontend
+          // 2. Push expanded object to Upstash Redis
           const redisData = {
             roll_number: row.roll_number,
             student_name: row.student_name,
-            marks: JSON.parse(marksString), // Turn the CSV string back into a real object
+            dob: row.dob,
+            father_name: row.father_name,
+            school_name: row.school_name,
+            marks: JSON.parse(marksString), // Turn complex string back to nested object
             total_score: totalScore,
+            status: row.status,
           };
 
           await redis.set(`result:${row.roll_number}`, redisData);
@@ -69,15 +80,14 @@ app.post("/api/admin/upload-results", upload.single("file"), (req, res) => {
 
         res
           .status(200)
-          .json({ message: "Results successfully processed and cached." });
+          .json({
+            message: "Detailed results successfully processed and cached.",
+          });
       } catch (error) {
         console.error("Upload Error:", error);
         res.status(500).json({ error: "Database transaction failed." });
       } finally {
-        // Always release the database connection
         client.release();
-
-        // Always delete the temp file, even if the database crashes
         if (fs.existsSync(req.file!.path)) {
           fs.unlinkSync(req.file!.path);
         }
